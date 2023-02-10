@@ -8,7 +8,7 @@ code takes hours between 0-08 and schedule shelly device to 3 cheapest hours. se
 
 ##how to use
 
-Copy codes to your shelly repository and modify CONFIG object to match your device. you also need right endpoint to get nord pool prices, you can ask it arto.ohenoja@gmail.com . I have hidden it from the code. run StartScheduling code to start find prices and get right loop for codes.
+Copy codes to your shelly repository and modify CONFIG object to match your device. you also need right endpoint (NordPoolPriceSchedule code object CONFIG.spotPriceUrl) to get nord pool prices, you can ask it arto.ohenoja@gmail.com . I have hidden it from the code. run StartScheduling code to start find prices and get right loop for codes.
 
 ##support
 
