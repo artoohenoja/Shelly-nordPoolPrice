@@ -1,0 +1,286 @@
+ 
+ let CONFIG = {
+   currentScriptNumber : Shelly.getCurrentScriptId(),
+   spotPriceUrl : "",   //!!!!!!!!! 
+   timeArray : ["1.0" , "1.1" , "1.2" , "1.3" , "1.4" , "1.5" , "1.6" , "1.7" , "1.8"],
+   winterPriceAdd : 25,
+   timeTable : [0,0,0],
+   twoCheapestHours : [0,0],
+ };
+ 
+ 
+   //findingPrices variables
+   //priceArray.lenght didnt work in for loop, need to use global variable.
+   let loopRounds = 9;
+ 
+ 
+ /////////// MAIN FUNCTIONS
+ /////////// -findPrices   
+//////////// -getPrices     
+ /////////// -scheduleArray 
+
+ 
+ function findPrices(){
+ 
+ print("start, finding prices")
+ 
+ Shelly.call("HTTP.GET", { url: CONFIG.spotPriceUrl, timeout:60, ssl_ca:"*"}, 
+ function(res, error_code, error_msg, ud) {
+   if(error_code === 0){
+     getPrices(res);
+   }
+   else{
+     print(error_code,error_msg);
+     Shelly.call("Script.stop", { "id": CONFIG.currentScriptNumber },null,null);
+   }
+ });
+ }
+ 
+ function getPrices(result){
+ 
+      
+   let priceArray = [];
+   let pricesJson;
+ 
+    // function findPrices result to pricesJson variable
+    pricesJson = JSON.parse(result.body);
+   
+    //Array that contain time and price
+      for (let index = 0; index < CONFIG.timeArray.length; index++) {
+
+        priceArray.push(pricesJson.hourly_prices[CONFIG.timeArray[index]]);
+       
+      }
+      
+     //add 0.25€ because electricity total (energy+ transmission) price is higher 
+    
+     priceArray[7].price = priceArray[7].price + CONFIG.winterPriceAdd;
+     priceArray[8].price = priceArray[8].price + CONFIG.winterPriceAdd;
+     
+     
+     //get lowest prices from priceArray
+     
+     //1st get the lowest price and inserting it time to the CONFIG.timetable.
+     let lowest = getLowest(priceArray);
+     loopRounds = loopRounds - 1;
+     CONFIG.timeTable[0] = convertTime(lowest.time);
+     CONFIG.twoCheapestHours[0] =  CONFIG.timeTable[0];
+  
+  
+    //After lowestprice, splice lowest price from priceArray and finding the 2nd lowest price 
+    // and inserting it time to the CONFIG.timetable.
+     priceArray.splice(lowest.index, 1);
+     let lowest2 = getLowest(priceArray);
+     loopRounds = loopRounds - 1;
+     CONFIG.timeTable[1] = convertTime(lowest2.time);
+     CONFIG.twoCheapestHours[1] = CONFIG.timeTable[1];
+     
+     
+     //After 2nd, splice 2nd lowest price from priceArray and finding the 3rd lowest price
+     //and inserting it time to the CONFIG.timetable
+     priceArray.splice(lowest2.index, 1);
+     let lowest3 = getLowest(priceArray);
+     loopRounds = loopRounds - 1;
+     CONFIG.timeTable[2] = convertTime(lowest3.time);
+     CONFIG.timeTable = sortArray(CONFIG.timeTable);
+     
+    
+     //schedule after finding 3 cheapest hours
+     
+      scheduleArray(CONFIG.timeTable);
+   
+ }
+ 
+    
+function scheduleArray(scheduleArray){
+
+  let sum = scheduleArray[0] - scheduleArray[1];
+  let sum2 = scheduleArray[1] - scheduleArray[2];
+  print("sum");
+  print(sum);
+  print("sum2");
+  print(sum2);
+
+  
+  if(sum === -1 && sum2 === -1){
+    print("all hours in row");
+    print(Shelly.call("Schedule.DeleteAll")); 
+    let scheduleTime = {start : scheduleArray[0], stop : scheduleArray[2] + 1  };
+    scheduleTimer(scheduleTime); 
+    
+  }
+  else if (sum !== -1 && sum2 === -1){
+    print("smallest different than others two");
+     print(Shelly.call("Schedule.DeleteAll"));  //delete all schedules
+     //schedule(scheduleArray[0],scheduleArray[0] + 1);
+     let scheduleTime = {start : scheduleArray[0], stop : scheduleArray[0] + 1  };
+     print("start timer");
+     Timer.set(2000,false,scheduleTimer, scheduleTime);
+     
+     let scheduleTime2 = {start : scheduleArray[1], stop : scheduleArray[2] + 1  };
+     print("start timer2");
+     Timer.set(4000,false,scheduleTimer, scheduleTime2);
+  }
+  else if (sum === -1 && sum2 !== -1){
+    print("biggest hour different thant two other");
+    print(Shelly.call("Schedule.DeleteAll"));  //delete all schedules
+     //schedule(scheduleArray[0],scheduleArray[0] + 1);
+     let scheduleTime = {start : scheduleArray[0], stop : scheduleArray[1] + 1  };
+     print("start timer");
+     Timer.set(2000,false,scheduleTimer, scheduleTime);
+     
+     let scheduleTime2 = {start : scheduleArray[2], stop : scheduleArray[2] + 1  };
+     print("start timer2");
+     Timer.set(4000,false,scheduleTimer, scheduleTime2);
+     
+  }
+  else if (sum !== -1 && sum2 !== -1){
+    print("non hours in row");
+     print(Shelly.call("Schedule.DeleteAll"));  //delete all schedules
+     //schedule(scheduleArray[0],scheduleArray[0] + 1);
+     let scheduleTime = {start : scheduleArray[0], stop : scheduleArray[0] + 1  };
+     print("start timer");
+     Timer.set(2000,false,scheduleTimer, scheduleTime);
+     
+     let scheduleTime2 = {start : scheduleArray[1], stop : scheduleArray[1] + 1  };
+     print("start timer2");
+     Timer.set(4000,false,scheduleTimer, scheduleTime2);
+     
+      let scheduleTime2 = {start : scheduleArray[2], stop : scheduleArray[2] + 1  };
+     print("start timer3");
+     Timer.set(6000,false,scheduleTimer, scheduleTime2);
+     
+    
+  }
+  
+
+} 
+ 
+ 
+///////////// FUNCTIONS      
+//////////// -getLowest      
+//////////// -convertTime   
+//////////// -scheduleTimer  
+//////////// -sortArray      
+//////////// -scheduleArray  
+  
+function getLowest(findArray){
+
+   let LOWESTPRICE = {
+		index : 0,
+		time : 9,
+        price : 9999999,
+	
+   };
+   
+   for (let index = 0; index < loopRounds; index++) {
+  
+    if (LOWESTPRICE.price > findArray[index].price) {
+        LOWESTPRICE.price = findArray[index].price;
+        LOWESTPRICE.time = findArray[index].time;
+        LOWESTPRICE.index = index;
+             
+     }
+       
+    }
+    
+    return LOWESTPRICE;
+
+   
+} 
+
+  ///////////////////////////**********///////////////
+  /// Get right hour from string and return number //
+  ///////////////////////////**********/////////////
+
+function convertTime(time){
+
+    
+    let timeHelp = time.slice(12, 13);
+    return JSON.parse(timeHelp);
+    
+}
+ 
+
+  
+ 
+   ///////////////////////////**********/////////////
+  /// Schedule shelly  ***************************//
+  ///////////////////////////**********///////////
+ 
+  
+  function scheduleTimer(times){
+  
+  print(Shelly.call("Schedule.Create", {
+        "id": 0, 
+        "enable": true, 
+        "timespec": "0 0 " + JSON.stringify(times.start) + " " + "* * SUN,MON,TUE,WED,THU,FRI,SAT",
+        "calls": [{
+            "method": "Switch.Set",
+            "params": {
+                id: 0,
+                "on": true
+            }
+        }]
+    }
+    ));
+    
+    print(Shelly.call("Schedule.Create", {
+        "id": 0, 
+        "enable": true, 
+        "timespec": "0 0 " + JSON.stringify(times.stop) + " " + "* * SUN,MON,TUE,WED,THU,FRI,SAT",
+        "calls": [{
+            "method": "Switch.Set",
+            "params": {
+                id: 0,
+                "on": false
+            }
+        }]
+    }
+    ));
+    
+  }
+  
+  
+  //////////*******************************//////////////// 
+////////// function to sort 3 items Array ///////////////  
+//////////*******************************//////////////      
+     
+ function sortArray(editableArray){
+   
+   //Variables
+   let returnArray= [20000,20000,20000];
+   let returnArrayIndex = 0;
+   let indexToRemove = 100;
+   let tableLenght = 3;
+   
+   
+   //1st for loop, after finding lowest number then remove that from table and finding new one.
+   for (let index = 0; index < tableLenght ; index++){
+ 
+   //2nd for loop, finding lowest number and inseting that to returnArray
+   for (let index = 0; index < 3 ; index++){
+   
+     if(editableArray[index] < returnArray[returnArrayIndex ]){
+        
+        returnArray[returnArrayIndex ] = editableArray[index];
+        indexToRemove = index;
+     }
+  
+   }
+   
+  returnArrayIndex  = returnArrayIndex  + 1;  
+  editableArray.splice(indexToRemove, 1);
+
+ }
+ 
+ return returnArray;
+ 
+ }
+  
+  
+
+// Start finding prices 
+  
+ findPrices();
+ 
