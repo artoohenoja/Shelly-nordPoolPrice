@@ -5,7 +5,7 @@
          currentScriptNumber : Shelly.getCurrentScriptId(),
          stopAfter : 7200000,  // 2h // given CONFIG.scriptNumber variable script will stop after this time (milliseconds).
          restartTimeInterval : 120000, // 2min // if CONFIG.scriptNumber variable script has chashed, it will restart after given time (milliseconds).
-         currentScriptScheduleTime : "0 35 18", // Schedule this script to start at (seconds, min, hours).   
+         currentScriptScheduleTime : "0 15 17", // Schedule this script to start at (seconds, min, hours).   
          retrytimes : 3,
          retrytries : 0,
          };
